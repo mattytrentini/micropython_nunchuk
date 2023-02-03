@@ -3,13 +3,13 @@
 # SPDX-License-Identifier: MIT
 
 """
-`adafruit_nunchuk`
+`nunchuk`
 ================================================================================
 
-CircuitPython library for Nintendo Nunchuk controller
+MicroPython library for Nintendo Nunchuk controller
 
 
-* Author(s): Carter Nelson
+* Author(s): Carter Nelson, Matt Trentini, Oliver Robson
 
 Implementation Notes
 --------------------
@@ -18,38 +18,25 @@ Implementation Notes
 
 * `Wii Remote Nunchuk <https://en.wikipedia.org/wiki/Wii_Remote#Nunchuk>`_
 * `Wiichuck <https://www.adafruit.com/product/342>`_
-
-**Software and Dependencies:**
-
-* Adafruit CircuitPython firmware for the supported boards:
-  https://github.com/adafruit/circuitpython/releases
-* Adafruit's Bus Device library: https://github.com/adafruit/Adafruit_CircuitPython_BusDevice
 """
 import time
 from collections import namedtuple
-from adafruit_bus_device.i2c_device import I2CDevice
+from machine import I2C
 
-try:
-    import typing  # pylint: disable=unused-import
-    from busio import I2C
-except ImportError:
-    pass
 
 __version__ = "0.0.0+auto.0"
-__repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_Nunchuk.git"
-
-_I2C_INIT_DELAY = 0.1
+__repo__ = "https://github.com/mattytrentini/micropython_nunchuk"
 
 
 class Nunchuk:
-    """Class which provides interface to Nintendo Nunchuk controller.
+    """Class which provides an interface to a Nintendo Nunchuk controller.
 
-    :param ~I2C i2c: The `busio.I2C` object to use.
+    :param ~I2C i2c: The `machine.I2C` object to use.
     :param int address: (Optional) The I2C address of the device. Default is 0x52.
-    :param float i2c_read_delay: (Optional) The time in seconds to pause between the
-        I2C write and read. This needs to be at least 200us. A
-        conservative default of 2000us is used since some hosts may
-        not be able to achieve such timing.
+    :param int i2c_read_delay_us: (Optional) The time in microseconds to pause
+        between the I2C write and read. This needs to be at least 200us.
+    :param int i2c_init_delay_ms: (Optional) The time in milliseconds to pause
+        before each write to unencrypt the Nunchuk communications.
     """
 
     _Values = namedtuple("Values", ("joystick", "buttons", "acceleration"))
@@ -58,18 +45,23 @@ class Nunchuk:
     _Acceleration = namedtuple("Acceleration", ("x", "y", "z"))
 
     def __init__(
-        self, i2c: I2C, address: int = 0x52, i2c_read_delay: float = 0.002
+        self,
+        i2c: I2C,
+        address: int = 0x52,
+        i2c_read_delay_us: int = 200,
+        i2c_init_delay_ms: int = 100
     ) -> None:
-        self.buffer = bytearray(8)
-        self.i2c_device = I2CDevice(i2c, address)
-        self._i2c_read_delay = i2c_read_delay
-        time.sleep(_I2C_INIT_DELAY)
-        with self.i2c_device as i2c_dev:
-            # turn off encrypted data
-            # http://wiibrew.org/wiki/Wiimote/Extension_Controllers
-            i2c_dev.write(b"\xF0\x55")
-            time.sleep(_I2C_INIT_DELAY)
-            i2c_dev.write(b"\xFB\x00")
+        self.buffer = bytearray(6)
+        self.address = address
+        self._i2c = i2c
+        self._i2c_read_delay_us = i2c_read_delay_us
+
+        time.sleep_ms(i2c_init_delay_ms)
+        # turn off encrypted data
+        # http://wiibrew.org/wiki/Wiimote/Extension_Controllers
+        self._i2c.writeto(self.address, bytes([0xF0, 0x55]))
+        time.sleep_ms(i2c_init_delay_ms)
+        self._i2c.writeto(self.address, bytes([0xFB, 0x00]))
 
     @property
     def values(self) -> _Values:
@@ -83,17 +75,17 @@ class Nunchuk:
 
     @property
     def joystick(self) -> _Joystick:
-        """The current joystick position."""
+        """The current joystick position (from 0 to 255)."""
         return self._joystick()
 
     @property
     def buttons(self) -> _Buttons:  # pylint: disable=invalid-name
-        """The current pressed state of buttons C and Z."""
+        """The current pressed state of buttons C and Z (boolean)."""
         return self._buttons()
 
     @property
     def acceleration(self) -> _Acceleration:
-        """The current accelerometer reading."""
+        """The current accelerometer reading (from 0 to 512)."""
         return self._acceleration()
 
     def _joystick(self, do_read: bool = True) -> _Joystick:
@@ -118,11 +110,10 @@ class Nunchuk:
         )
 
     def _read_data(self) -> bytearray:
-        return self._read_register(b"\x00")
+        return self._read_register(0x00)
 
-    def _read_register(self, address) -> bytearray:
-        with self.i2c_device as i2c:
-            i2c.write(address)
-            time.sleep(self._i2c_read_delay)  # at least 200us
-            i2c.readinto(self.buffer)
+    def _read_register(self, register) -> bytearray:
+        self._i2c.writeto(self.address, bytes([register]))
+        time.sleep_us(self._i2c_read_delay_us)
+        self._i2c.readfrom_into(self.address, self.buffer)
         return self.buffer

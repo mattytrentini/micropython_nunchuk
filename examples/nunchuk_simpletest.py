@@ -2,10 +2,12 @@
 # SPDX-License-Identifier: MIT
 
 import time
-import board
-import adafruit_nunchuk
+from machine import I2C
+import nunchuk
 
-nc = adafruit_nunchuk.Nunchuk(board.I2C())
+i2c = I2C(1)
+print("Scan results: {}".format(i2c.scan()))
+nc = nunchuk.Nunchuk(i2c)
 
 while True:
     x, y = nc.joystick

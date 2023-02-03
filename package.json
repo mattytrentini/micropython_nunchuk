@@ -1,0 +1,6 @@
+{
+    "urls": [
+      ["nunchuk/nunchuk.py", "github:mattytrentini/micropython-nunchuk/nunchuk.py"]
+    ],
+    "version": "0.1"
+}
