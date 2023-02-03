@@ -1,7 +1,7 @@
 {
     "urls": [
       ["nunchuk.py", "github:mattytrentini/micropython_nunchuk/nunchuk.py"],
-      ["examples/nunchuk_simpletest.py", "github:mattytrentini/micropython_nunchuk/examples/nunchuk.py"]
+      ["examples/nunchuk_simpletest.py", "github:mattytrentini/micropython_nunchuk/examples/nunchuk_simpletest.py"]
     ],
     "version": "0.1"
 }
